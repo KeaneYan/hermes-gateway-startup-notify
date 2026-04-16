@@ -1,7 +1,7 @@
 ---
 name: gateway-startup-notify
-description: Gateway startup hook that sends notification via WeChat (iLink Bot API) when gateway restarts
-version: 1.1.0
+description: Gateway startup hook that sends notification via WeChat (iLink Bot API) when the Hermes gateway finishes restarting
+version: 1.2.0
 author: Hermes Community
 license: MIT
 metadata:
@@ -12,83 +12,179 @@ metadata:
 
 # Gateway Startup Notify Hook
 
-Sends a WeChat notification automatically when the Hermes gateway finishes starting up. Uses the iLink Bot API.
+Send a WeChat notification automatically when the Hermes gateway finishes starting up.
 
-## Setup
+This skill is for users who want a **"gateway is alive again"** message after:
+- machine reboot
+- `systemctl --user restart hermes-gateway`
+- crash recovery
+- deploy / pull / restart workflows
 
-### 1. Create Hook Directory
+It uses the **iLink Bot API** and Hermes' **gateway startup hook** event.
+
+## What this skill gives you
+
+This skill now includes reusable files:
+- `templates/HOOK.yaml`
+- `templates/handler.py`
+- `references/api-notes.md`
+
+Use those instead of rewriting the handler from scratch.
+
+## Prerequisites
+
+You need:
+1. a working Hermes gateway setup
+2. a reachable iLink / WeChat bot endpoint
+3. these env vars configured in your Hermes `.env` or service environment:
+   - `WEIXIN_BASE_URL`
+   - `WEIXIN_TOKEN`
+   - `WEIXIN_NOTIFY_TARGET`
+
+## Install Layout
+
+Create a hook directory:
 
 ```bash
 mkdir -p ~/.hermes/hooks/gateway-notify
 ```
 
-### 2. Create HOOK.yaml
+Then copy the provided templates:
+
+```bash
+cp <skill-dir>/templates/HOOK.yaml ~/.hermes/hooks/gateway-notify/HOOK.yaml
+cp <skill-dir>/templates/handler.py ~/.hermes/hooks/gateway-notify/handler.py
+chmod +x ~/.hermes/hooks/gateway-notify/handler.py
+```
+
+If you are reading this through Hermes skill loading, open the linked template files and copy them into place.
+
+## Hook Config
+
+Use this `HOOK.yaml`:
 
 ```yaml
-# ~/.hermes/hooks/gateway-notify/HOOK.yaml
 event: gateway:startup
 handler: handler.py
 ```
-
-### 3. Create handler.py
-
-The handler script should:
-
-1. Read connection config from environment variables: `WEIXIN_BASE_URL`, `WEIXIN_TOKEN`, `WEIXIN_NOTIFY_TARGET`
-2. Build a JSON payload with the notification message
-3. POST to the iLink Bot API at `{base_url}/api/v2/chat/contact`
-4. Parse the response and check `ret` field (0 = success, -1 = failure)
-
-Configure these variables in your Hermes `.env` file. The `WEIXIN_NOTIFY_TARGET` should be the WeChat OpenID of the notification recipient.
-
-### 4. Required iLink HTTP Headers
-
-The API requires these exact headers or it silently fails:
-
-| Header | Value | Notes |
-|--------|-------|-------|
-| `iLink-App-ClientVersion` | `"131330"` | Computed as `(2<<16)\|(2<<8)\|0` |
-| `Authorization` | `Bearer <token>` | From env var |
-| `X-WECHAT-UIN` | Random base64 string | Must be present, value doesn't matter |
-| `Content-Length` | Exact body byte length | Must match |
-| `channel_version` | `"2.2.0"` | Must match exactly |
-
-### 5. Required JSON Body Fields
-
-| Field | Type | Value | Note |
-|-------|------|-------|------|
-| `message_type` | **int** | `2` | NOT string `"bot"` |
-| `message_state` | **int** | `2` | NOT string `"finish"` |
-| `item_list[].type` | **int** | `1` | NOT string `"text"` |
-| `channel_version` | string | `"2.2.0"` | NOT `"1.0.0"` |
-| `to_contact` | string | Target OpenID | From env var |
-| `item_list[].content` | string | Your message | UTF-8 supported |
-
-## iLink API Pitfalls
-
-The iLink API is extremely strict about request format. Wrong values cause **silent failures** — HTTP 200 with `{"ret": -1}`:
-
-- Integer fields must be actual integers, not strings
-- `iLink-App-ClientVersion` must be the numeric encoding, not a version string
-- `X-WECHAT-UIN` header must exist even though the value is arbitrary
-- `Content-Length` must be exact byte count of UTF-8 encoded body
-
-## Debugging
-
-- Hook logs appear in **`agent.log`** (not `gateway.log`) — the gateway log filter only accepts `gateway.*` logger prefixes
-- **Always check response body** — HTTP 200 + `{"ret":-1}` means failure
-- If Hermes updates weixin.py constants, update `CHANNEL_VERSION` and `ILINK_APP_CLIENT_VERSION` accordingly
-
-## How It Works
-
-1. Gateway emits `gateway:startup` event after all platforms connect
-2. Hook system discovers and loads hooks from `~/.hermes/hooks/`
-3. Handler receives connected platform list and sends notification via iLink API
 
 ## Environment Variables
 
 | Variable | Purpose | Example |
 |----------|---------|---------|
-| `WEIXIN_BASE_URL` | iLink server URL | `https://your-ilink-server.example.com` |
-| `WEIXIN_TOKEN` | API authentication token | (set in .env) |
-| `WEIXIN_NOTIFY_TARGET` | Recipient WeChat OpenID | `openid@im.wechat` |
+| `WEIXIN_BASE_URL` | iLink server base URL | `https://your-ilink-server.example.com` |
+| `WEIXIN_TOKEN` | API auth token | `Bearer` token value |
+| `WEIXIN_NOTIFY_TARGET` | Target WeChat OpenID | `openid@im.wechat` |
+
+## Required iLink Headers
+
+The iLink API is picky. These headers must be correct:
+
+| Header | Value | Notes |
+|--------|-------|-------|
+| `iLink-App-ClientVersion` | `131330` | Computed as `(2<<16) | (2<<8) | 0` |
+| `Authorization` | `Bearer <token>` | From env var |
+| `X-WECHAT-UIN` | random base64-ish string | Must exist |
+| `Content-Length` | exact UTF-8 byte length | Must match the encoded body |
+| `channel_version` | `2.2.0` | Must match exactly |
+
+## Required JSON Fields
+
+| Field | Type | Value | Note |
+|-------|------|-------|------|
+| `message_type` | int | `2` | not string |
+| `message_state` | int | `2` | not string |
+| `item_list[].type` | int | `1` | not string |
+| `channel_version` | string | `"2.2.0"` | exact value |
+| `to_contact` | string | target OpenID | from env |
+| `item_list[].content` | string | notification text | UTF-8 okay |
+
+## Message Behavior
+
+A good startup message usually includes:
+- gateway instance name / hostname
+- startup timestamp
+- connected platforms count or names
+- maybe process ID or environment label (`prod` / `home` / `vps`)
+
+Example:
+
+```text
+Hermes gateway started successfully
+Host: vps-01
+Platforms: weixin, feishu
+Time: 2026-04-16 14:03:12
+```
+
+## Verification
+
+After installing the hook:
+
+### 1. Restart gateway
+
+```bash
+systemctl --user restart hermes-gateway
+```
+
+Or start it manually if that's how you run Hermes.
+
+### 2. Check whether the message arrived
+
+If the hook works, the target WeChat account should receive the startup notification.
+
+### 3. Check logs
+
+Hook logs usually land in **`agent.log`**, not `gateway.log`.
+
+Look for:
+- hook discovery / execution lines
+- HTTP response body from iLink
+- failures like `{"ret": -1}`
+
+## Debugging Checklist
+
+If it does not work, check these in order:
+
+1. **Did the hook file get discovered?**
+   - wrong path or bad `HOOK.yaml` means it never runs
+
+2. **Did the handler execute?**
+   - check `agent.log`
+
+3. **Did the request return HTTP 200 but still fail?**
+   - iLink often returns HTTP 200 with `{"ret": -1}`
+   - that still means failure
+
+4. **Did you send ints as strings?**
+   - this is a common silent-failure cause
+
+5. **Did `Content-Length` match UTF-8 byte count?**
+   - especially important if the message contains Chinese text
+
+6. **Did Hermes / Weixin constants change upstream?**
+   - if `weixin.py` changes `CHANNEL_VERSION` or `ILINK_APP_CLIENT_VERSION`, update the handler accordingly
+
+## Common Pitfalls
+
+- iLink accepts the request but returns `ret = -1`
+- integer fields serialized as strings
+- missing `X-WECHAT-UIN`
+- wrong `channel_version`
+- stale token / wrong target OpenID
+- editing the hook but forgetting to restart the gateway
+
+## How It Works
+
+1. Hermes gateway finishes startup
+2. Hermes emits the `gateway:startup` hook event
+3. Hook loader discovers `~/.hermes/hooks/gateway-notify/HOOK.yaml`
+4. `handler.py` runs
+5. Handler posts a text message to the iLink Bot API
+6. WeChat receives the notification
+
+## References
+
+See linked files for copy-pasteable assets and API notes:
+- `templates/HOOK.yaml`
+- `templates/handler.py`
+- `references/api-notes.md`

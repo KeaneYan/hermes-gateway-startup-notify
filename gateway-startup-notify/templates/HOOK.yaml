@@ -1,0 +1,2 @@
+event: gateway:startup
+handler: handler.py
