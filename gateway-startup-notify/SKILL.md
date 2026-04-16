@@ -1,18 +1,27 @@
 ---
 name: gateway-startup-notify
-description: Gateway startup hook that sends notification via WeChat (iLink Bot API) when the Hermes gateway finishes restarting
-version: 1.2.0
+description: Hermes gateway startup / restart notification hook for WeChat (Weixin) via the iLink Bot API and gateway:startup event
+version: 1.2.1
 author: Hermes Community
 license: MIT
 metadata:
   hermes:
-    tags: [gateway, hook, notification, weixin, wechat, ilink]
+    tags: [gateway, startup, restart, hook, notification, gateway-startup, weixin, wechat, ilink]
     category: devops
 ---
 
 # Gateway Startup Notify Hook
 
-Send a WeChat notification automatically when the Hermes gateway finishes starting up.
+Send a **Hermes gateway startup notification** automatically when the gateway finishes starting up.
+
+This skill targets common search intents like:
+- Hermes gateway
+- gateway startup notification
+- restart notification
+- gateway:startup hook
+- WeChat hook
+- Weixin hook
+- iLink bot API
 
 This skill is for users who want a **"gateway is alive again"** message after:
 - machine reboot
@@ -20,7 +29,7 @@ This skill is for users who want a **"gateway is alive again"** message after:
 - crash recovery
 - deploy / pull / restart workflows
 
-It uses the **iLink Bot API** and Hermes' **gateway startup hook** event.
+It uses the **iLink Bot API** and Hermes' **`gateway:startup` hook event**.
 
 ## What this skill gives you
 
