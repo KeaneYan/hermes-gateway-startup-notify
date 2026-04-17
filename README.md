@@ -1,20 +1,27 @@
 # Hermes Gateway Startup Notify
 
-A focused Hermes skill repo for **gateway startup notification**, **restart notification**, and **WeChat / Weixin hook** setup.
+A focused Hermes skill repo for **gateway startup notification**, **restart notification**, and **WeChat / Telegram hook** setup.
 
 This repository currently ships one skill for the Hermes gateway hook system:
 
 ## Available Skill
 
 ### `gateway-startup-notify`
-Send a **Hermes gateway startup notification** through the **WeChat / Weixin iLink Bot API** whenever the gateway finishes starting up.
+Send a **Hermes gateway startup notification** through **WeChat (iLink Bot API)** or **Telegram (Bot API)** whenever the gateway finishes starting up.
 
 Useful for:
 - confirming a remote Hermes gateway restarted successfully
 - getting a startup notification after deploy / reboot
 - monitoring always-on Hermes instances
-- receiving a **gateway:startup hook** alert in WeChat
+- receiving a **gateway:startup hook** alert in WeChat or Telegram
 - setting up a **restart notification hook** for Hermes
+
+### Supported Channels
+
+| Channel | Handler | API |
+|---------|---------|-----|
+| WeChat / Weixin | `handler.py` | iLink Bot API |
+| Telegram | `handler-telegram.py` | Telegram Bot API |
 
 ## Install
 
@@ -51,6 +58,8 @@ This repo is intentionally focused on these search intents:
 - WeChat hook
 - Weixin hook
 - iLink bot API
+- Telegram notification
+- Telegram bot hook
 
 ## Repo Layout
 
@@ -63,19 +72,23 @@ hermes-gateway-startup-notify/
     ├── SKILL.md
     ├── templates/
     │   ├── HOOK.yaml
-    │   └── handler.py
+    │   ├── handler.py              # WeChat / iLink
+    │   └── handler-telegram.py     # Telegram
     └── references/
-        └── api-notes.md
+        ├── api-notes.md            # iLink API notes
+        └── telegram-api-notes.md   # Telegram API notes
 ```
 
 Keeping each skill at the repo root helps external indexes like skills.sh pick it up correctly.
 
 ## What the Skill Includes
 
-The `gateway-startup-notify` skill now includes:
+The `gateway-startup-notify` skill includes:
 - a ready-to-copy `HOOK.yaml`
-- a ready-to-copy `handler.py`
+- a ready-to-copy `handler.py` (WeChat / iLink)
+- a ready-to-copy `handler-telegram.py` (Telegram)
 - request-format notes for the WeChat / Weixin iLink API
+- request-format notes for the Telegram Bot API
 - verification steps
 - debugging and troubleshooting guidance
 
